@@ -1,28 +1,36 @@
 import os
 from telegram import Update
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler,
-    MessageHandler, filters, ContextTypes,
-    ConversationHandler
+    ApplicationBuilder, CommandHandler, MessageHandler,
+    ConversationHandler, ContextTypes, filters
 )
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
+# متغيرات البيئة من Render
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+
 # مراحل المحادثة
 DATE, MONTHS, SYSTEM = range(3)
 
+# بدء المحادثة
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "*📅 أرسل تاريخ آخر تغيير عنوان وظيفي، مثال:*\n"
-        "`2021-11-01`\n`٠١-١١-٢٠٢١`\n`2021/11/01`\n`01/11/2021`",
+        "`2021-11-01`\n"
+        "`01-11-2021`\n"
+        "`2021/11/01`\n"
+        "`01/11/2021`",
         parse_mode="Markdown"
     )
     return DATE
 
+# استقبال التاريخ
 async def get_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["last_date"] = update.message.text
     await update.message.reply_text(
-        "*\ud83c\udf4c ملاحظات احتساب كتب الشكر:*\n\n"
+        "*📌 ملاحظات احتساب كتب الشكر:*\n\n"
         "*1️⃣* كتاب شكر من المدير العام = *1 شهر*\n"
         "*2️⃣* كتاب شكر من الوزير = *1 شهر*\n"
         "*3️⃣* كتاب شكر من رئيس الوزراء = *6 أشهر*\n\n"
@@ -31,12 +39,13 @@ async def get_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return MONTHS
 
+# استقبال عدد الأشهر
 async def get_months(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         context.user_data["thanks_months"] = int(update.message.text)
         await update.message.reply_text(
             "*❓ ما هي فترة تغيير العنوان الوظيفي؟*\n"
-            "*🧲 اختر النظام:*\n"
+            "*🧮 اختر النظام:*\n"
             "*1️⃣* نظام 4 سنوات\n"
             "*2️⃣* نظام 5 سنوات\n"
             "*✍️ أرسل 4 أو 5:*",
@@ -47,6 +56,7 @@ async def get_months(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("*⚠️ أدخل رقمًا صحيحًا فقط لعدد أشهر كتب الشكر.*", parse_mode="Markdown")
         return MONTHS
 
+# حساب التاريخ النهائي
 async def get_system(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         system_years = int(update.message.text)
@@ -63,7 +73,10 @@ async def get_system(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(
                     "*⚠️ صيغة التاريخ غير صحيحة.*\n"
                     "*✅ استخدم أحد التنسيقات التالية:*\n"
-                    "`2024-06-09`\n`09-06-2024`\n`2024/06/09`\n`09/06/2024`",
+                    "`2024-06-09`\n"
+                    "`09-06-2024`\n"
+                    "`2024/06/09`\n"
+                    "`09/06/2024`",
                     parse_mode="Markdown"
                 )
                 return DATE
@@ -79,13 +92,13 @@ async def get_system(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text(
             f"*✅ الموعد النهائي لتغيير العنوان:* `{final_due.strftime('%Y/%m/%d')}`\n"
-            f"*📤 يمكنك رفع المعاملة اعتباراً من:* `{submission.strftime('%Y/%m/%d')}`\n"
+            f"*📤 يمكنك رفع المعاملة اعتبارًا من:* `{submission.strftime('%Y/%m/%d')}`\n"
             f"*⏳ المتبقي من الآن:* *{remain}* شهر",
             parse_mode="Markdown"
         )
 
         await update.message.reply_text("*🤖 شكراً لاستخدامك هذا البوت.*", parse_mode="Markdown")
-        await update.message.reply_text("*👨‍💼 مطور البوت: المهندس أحمد كاظم*", parse_mode="Markdown")
+        await update.message.reply_text("*👨‍💻 مطور البوت: المهندس أحمد كاظم*", parse_mode="Markdown")
 
         return ConversationHandler.END
 
@@ -97,15 +110,14 @@ async def get_system(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return DATE
 
+# إلغاء المحادثة
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("*🚫 تم إلغاء العملية.*", parse_mode="Markdown")
     return ConversationHandler.END
 
+# تشغيل البوت عبر Webhook
 def main():
-    from telegram.ext import Application
-
-    TOKEN = os.environ.get("BOT_TOKEN")
-    app = Application.builder().token(TOKEN).build()
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     conv = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
@@ -118,13 +130,13 @@ def main():
     )
 
     app.add_handler(conv)
+
     print("✅ Bot is running on Webhook...")
 
-    # webhook config
     app.run_webhook(
         listen="0.0.0.0",
-        port=int(os.environ.get("PORT", 8080)),
-        webhook_url=os.environ.get("WEBHOOK_URL")  # place your Render URL + /webhook
+        port=int(os.environ.get("PORT", 10000)),
+        webhook_url=WEBHOOK_URL
     )
 
 if __name__ == "__main__":
