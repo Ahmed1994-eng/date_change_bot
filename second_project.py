@@ -2,7 +2,8 @@ import os
 from telegram import Update
 from telegram.ext import (
     ApplicationBuilder, CommandHandler,
-    MessageHandler, ContextTypes, ConversationHandler, filters
+    MessageHandler, filters, ContextTypes,
+    ConversationHandler
 )
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
@@ -10,6 +11,7 @@ from dateutil.relativedelta import relativedelta
 # مراحل المحادثة
 DATE, MONTHS, SYSTEM = range(3)
 
+# بدء البوت
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "*📅 أرسل تاريخ آخر تغيير عنوان وظيفي، مثال:*
@@ -25,6 +27,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return DATE
 
+# استلام التاريخ
 async def get_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["last_date"] = update.message.text
     await update.message.reply_text(
@@ -43,6 +46,7 @@ async def get_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return MONTHS
 
+# استلام عدد كتب الشكر
 async def get_months(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         context.user_data["thanks_months"] = int(update.message.text)
@@ -63,6 +67,7 @@ async def get_months(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("*⚠️ أدخل رقمًا صحيحًا فقط لعدد أشهر كتب الشكر.*", parse_mode="Markdown")
         return MONTHS
 
+# استلام النظام وحساب الموعد
 async def get_system(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         system_years = int(update.message.text)
@@ -93,6 +98,7 @@ async def get_system(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return DATE
 
         thanks_months = context.user_data["thanks_months"]
+
         base_due = last_date + relativedelta(years=system_years)
         final_due = base_due - relativedelta(months=thanks_months)
         submission = final_due - relativedelta(months=3)
@@ -101,10 +107,8 @@ async def get_system(update: Update, context: ContextTypes.DEFAULT_TYPE):
         remain = max(0, (submission.year - today.year) * 12 + (submission.month - today.month))
 
         await update.message.reply_text(
-            f"*✅ الموعد النهائي لتغيير العنوان:* `{final_due.strftime('%Y/%m/%d')}`
-"
-            f"*📤 يمكنك رفع المعاملة اعتبارًا من:* `{submission.strftime('%Y/%m/%d')}`
-"
+            f"*✅ الموعد النهائي لتغيير العنوان:* `{final_due.strftime('%Y/%m/%d')}`\n"
+            f"*📤 يمكنك رفع المعاملة اعتبارًا من:* `{submission.strftime('%Y/%m/%d')}`\n"
             f"*⏳ المتبقي من الآن:* *{remain}* شهر",
             parse_mode="Markdown"
         )
@@ -116,26 +120,22 @@ async def get_system(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         await update.message.reply_text(
-            f"*⚠️ حدث خطأ أثناء الحساب:*
-`{e}`
-
-"
+            f"*⚠️ حدث خطأ أثناء الحساب:*\n`{e}`\n\n"
             "*🔄 يرجى إعادة إدخال تاريخ آخر تغيير عنوان وظيفي بصيغة صحيحة.*",
             parse_mode="Markdown"
         )
         return DATE
 
+# إلغاء المحادثة
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("*🚫 تم إلغاء العملية.*", parse_mode="Markdown")
     return ConversationHandler.END
 
+# تشغيل البوت بنظام polling (بدلاً من webhook)
 def main():
-    TOKEN = os.getenv("BOT_TOKEN")
-    WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+    app = ApplicationBuilder().token("7775916785:AAFLWjaNmTUTDVPg9-0ZDOTeJmepReYHJbM").build()
 
-    app = ApplicationBuilder().token(TOKEN).build()
-
-    conv_handler = ConversationHandler(
+    conv = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
             DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_date)],
@@ -145,14 +145,9 @@ def main():
         fallbacks=[CommandHandler("cancel", cancel)],
     )
 
-    app.add_handler(conv_handler)
-
-    print("✅ Bot is running on Webhook...")
-    app.run_webhook(
-        listen="0.0.0.0",
-        port=10000,
-        webhook_url=WEBHOOK_URL,
-    )
+    app.add_handler(conv)
+    print("✅ Bot is running using polling...")
+    app.run_polling()
 
 if __name__ == "__main__":
     main()
